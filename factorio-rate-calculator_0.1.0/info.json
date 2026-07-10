@@ -1,9 +1,0 @@
-{
-  "name": "factorio-rate-calculator",
-  "version": "0.1.0",
-  "title": "Factorio Rate Calculator",
-  "author": "Filipe",
-  "factorio_version": "2.1",
-  "description": "Adds production-rate information to item tooltips.",
-  "dependencies": ["base"]
-}

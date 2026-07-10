@@ -257,7 +257,7 @@ local function add_recipe_assembler_tooltips(recipe, recipe_assemblers, assemble
       end
 
       table.insert(recipe.custom_tooltip_fields, {
-        name = { "", "[item=" .. assembler_name .. "] Entrées" },
+        name = { "", "[item=" .. assembler_name .. "] Input" },
         value = build_ingredient_rates_text(recipe, crafts_per_second),
         order = order + 1,
         show_in_tooltip = true,
@@ -265,7 +265,7 @@ local function add_recipe_assembler_tooltips(recipe, recipe_assemblers, assemble
       })
 
       table.insert(recipe.custom_tooltip_fields, {
-        name = { "", "[item=" .. assembler_name .. "] Sorties" },
+        name = { "", "[item=" .. assembler_name .. "] Output" },
         value = build_product_rates_text(recipe, crafts_per_second),
         order = order + 2,
         show_in_tooltip = true,

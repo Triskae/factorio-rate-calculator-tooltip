@@ -57,7 +57,7 @@ local function add_rate_line(parent, prototype_type, prototype_name, rate)
 end
 
 local function add_ingredient_rates(parent, recipe, crafts_per_second)
-  parent.add({ type = "label", caption = "Entrées:" })
+  parent.add({ type = "label", caption = "Input:" })
 
   local rates_flow = parent.add({ type = "flow", direction = "vertical" })
   local displayed_entries = 0
@@ -82,7 +82,7 @@ local function add_ingredient_rates(parent, recipe, crafts_per_second)
 end
 
 local function add_product_rates(parent, entity, recipe, crafts_per_second)
-  parent.add({ type = "label", caption = "Sorties:" })
+  parent.add({ type = "label", caption = "Ouput:" })
 
   local rates_flow = parent.add({ type = "flow", direction = "vertical" })
   local displayed_entries = 0
@@ -148,11 +148,11 @@ local function build_gui(player, entity, recipe)
 
   frame.add({
     type = "label",
-    caption = { "", "Recette: ", recipe.prototype.localised_name or { "recipe-name." .. recipe.name } },
+    caption = { "", "Recipe: ", recipe.prototype.localised_name or { "recipe-name." .. recipe.name } },
   })
   frame.add({
     type = "label",
-    caption = { "", "Vitesse: ", rate_math.format_number(crafting_speed), "x" },
+    caption = { "", "Speed: ", rate_math.format_number(crafting_speed), "x" },
   })
   frame.add({ type = "line", direction = "horizontal" })
   add_ingredient_rates(frame, recipe, crafts_per_second)
