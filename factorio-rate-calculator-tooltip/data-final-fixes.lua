@@ -1,9 +1,9 @@
 local rate_math = require("rate-math")
 
-local assembler_prototypes = {
-  "assembling-machine-1",
-  "assembling-machine-2",
-  "assembling-machine-3",
+local crafting_machine_prototype_types = {
+  "assembling-machine",
+  "furnace",
+  "rocket-silo",
 }
 
 local recipe_tooltip_time_unit_setting_name = "factorio-rate-calculator-tooltip-recipe-tooltip-time-unit"
@@ -149,10 +149,10 @@ local function build_product_rates_text(recipe, crafts_per_second)
   return table.concat(text)
 end
 
-local function get_category_set(assembler)
+local function get_category_set(machine)
   local category_set = {}
 
-  for key, value in pairs(assembler.crafting_categories or {}) do
+  for key, value in pairs(machine.crafting_categories or {}) do
     if value == true then
       category_set[key] = true
     else
@@ -163,10 +163,10 @@ local function get_category_set(assembler)
   return category_set
 end
 
-local function recipe_matches_assembler(recipe, assembler_data)
+local function recipe_matches_crafting_machine(recipe, crafting_machine)
   if recipe.categories then
     for _, recipe_category in pairs(recipe.categories) do
-      if assembler_data.category_set[recipe_category] == true then
+      if crafting_machine.category_set[recipe_category] == true then
         return true
       end
     end
@@ -174,46 +174,64 @@ local function recipe_matches_assembler(recipe, assembler_data)
     return false
   end
 
-  return assembler_data.category_set[recipe.category or "crafting"] == true
+  return crafting_machine.category_set[recipe.category or "crafting"] == true
 end
 
-local function build_assembler_data()
-  local assemblers = {}
-
-  for _, assembler_name in ipairs(assembler_prototypes) do
-    local assembler = data.raw["assembling-machine"][assembler_name]
-
-    if assembler then
-      assemblers[assembler_name] = {
-        category_set = get_category_set(assembler),
-        crafting_speed = assembler.crafting_speed or 1,
-      }
-    end
-  end
-
-  return assemblers
-end
-
-local function get_recipe_assemblers(recipe, assembler_data)
-  local recipe_assemblers = {}
-
-  for _, assembler_name in ipairs(assembler_prototypes) do
-    if assembler_data[assembler_name] and recipe_matches_assembler(recipe, assembler_data[assembler_name]) then
-      recipe_assemblers[assembler_name] = true
-    end
-  end
-
-  return recipe_assemblers
-end
-
-local function has_compatible_assembler(recipe_assemblers)
-  for _, assembler_name in ipairs(assembler_prototypes) do
-    if recipe_assemblers[assembler_name] then
-      return true
-    end
+local function has_crafting_categories(machine)
+  for _, _ in pairs(machine.crafting_categories or {}) do
+    return true
   end
 
   return false
+end
+
+local function get_crafting_machine_sort_key(machine_name, machine)
+  return table.concat({
+    tostring(machine.order or ""),
+    tostring(machine.group or ""),
+    tostring(machine.subgroup or ""),
+    machine_name,
+  }, "|")
+end
+
+local function build_crafting_machine_data()
+  local crafting_machines = {}
+
+  for _, prototype_type in ipairs(crafting_machine_prototype_types) do
+    for machine_name, machine in pairs(data.raw[prototype_type] or {}) do
+      if not machine.hidden and has_crafting_categories(machine) then
+        crafting_machines[#crafting_machines + 1] = {
+          category_set = get_category_set(machine),
+          crafting_speed = machine.crafting_speed or 1,
+          icon = "[entity=" .. machine_name .. "]",
+          name = machine_name,
+          sort_key = get_crafting_machine_sort_key(machine_name, machine),
+        }
+      end
+    end
+  end
+
+  table.sort(crafting_machines, function(left, right)
+    return left.sort_key < right.sort_key
+  end)
+
+  return crafting_machines
+end
+
+local function get_recipe_crafting_machines(recipe, crafting_machine_data)
+  local recipe_crafting_machines = {}
+
+  for _, crafting_machine in ipairs(crafting_machine_data) do
+    if recipe_matches_crafting_machine(recipe, crafting_machine) then
+      recipe_crafting_machines[#recipe_crafting_machines + 1] = crafting_machine
+    end
+  end
+
+  return recipe_crafting_machines
+end
+
+local function has_compatible_crafting_machine(recipe_crafting_machines)
+  return #recipe_crafting_machines > 0
 end
 
 local function recipe_has_item_product(recipe)
@@ -236,8 +254,8 @@ local function add_recipe_separator(recipe, order)
   })
 end
 
-local function add_recipe_assembler_tooltips(recipe, recipe_assemblers, assembler_data)
-  if not has_compatible_assembler(recipe_assemblers) then
+local function add_recipe_crafting_machine_tooltips(recipe, recipe_crafting_machines)
+  if not has_compatible_crafting_machine(recipe_crafting_machines) then
     return
   end
 
@@ -248,36 +266,34 @@ local function add_recipe_assembler_tooltips(recipe, recipe_assemblers, assemble
   recipe.custom_tooltip_fields = recipe.custom_tooltip_fields or {}
   add_recipe_separator(recipe, tooltip_order_start)
 
-  for index, assembler_name in ipairs(assembler_prototypes) do
-    if recipe_assemblers[assembler_name] then
-      local crafts_per_second = get_crafts_per_second(recipe, assembler_data[assembler_name].crafting_speed)
-      local order = tooltip_order_start + (index * 3)
+  for index, crafting_machine in ipairs(recipe_crafting_machines) do
+    local crafts_per_second = get_crafts_per_second(recipe, crafting_machine.crafting_speed)
+    local order = tooltip_order_start + (index * 3)
 
-      if index > 1 then
-        add_recipe_separator(recipe, order)
-      end
-
-      table.insert(recipe.custom_tooltip_fields, {
-        name = { "factorio-rate-calculator-tooltip.assembler-input-label", "[item=" .. assembler_name .. "]" },
-        value = build_ingredient_rates_text(recipe, crafts_per_second),
-        order = order + 1,
-        show_in_tooltip = true,
-        show_in_factoriopedia = true,
-      })
-
-      table.insert(recipe.custom_tooltip_fields, {
-        name = { "factorio-rate-calculator-tooltip.assembler-output-label", "[item=" .. assembler_name .. "]" },
-        value = build_product_rates_text(recipe, crafts_per_second),
-        order = order + 2,
-        show_in_tooltip = true,
-        show_in_factoriopedia = true,
-      })
+    if index > 1 then
+      add_recipe_separator(recipe, order)
     end
+
+    table.insert(recipe.custom_tooltip_fields, {
+      name = { "factorio-rate-calculator-tooltip.crafting-machine-input-label", crafting_machine.icon },
+      value = build_ingredient_rates_text(recipe, crafts_per_second),
+      order = order + 1,
+      show_in_tooltip = true,
+      show_in_factoriopedia = true,
+    })
+
+    table.insert(recipe.custom_tooltip_fields, {
+      name = { "factorio-rate-calculator-tooltip.crafting-machine-output-label", crafting_machine.icon },
+      value = build_product_rates_text(recipe, crafts_per_second),
+      order = order + 2,
+      show_in_tooltip = true,
+      show_in_factoriopedia = true,
+    })
   end
 end
 
-local assembler_data = build_assembler_data()
+local crafting_machine_data = build_crafting_machine_data()
 
 for _, recipe in pairs(data.raw.recipe or {}) do
-  add_recipe_assembler_tooltips(recipe, get_recipe_assemblers(recipe, assembler_data), assembler_data)
+  add_recipe_crafting_machine_tooltips(recipe, get_recipe_crafting_machines(recipe, crafting_machine_data))
 end
