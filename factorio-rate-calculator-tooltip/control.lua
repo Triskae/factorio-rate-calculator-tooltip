@@ -1,7 +1,7 @@
 local rate_math = require("rate-math")
 
 local gui_name = "frc_live_rates_frame"
-local display_time_unit = "minute"
+local live_tooltip_time_unit_setting_name = "factorio-rate-calculator-tooltip-live-tooltip-time-unit"
 local max_rate_entries_per_field = 4
 local live_gui_width = 330
 local game_side_panel_width = 315
@@ -44,7 +44,18 @@ local function get_productivity_multiplier(entity, recipe)
   return 1 + math.min(productivity_bonus, maximum_productivity)
 end
 
-local function add_rate_line(parent, prototype_type, prototype_name, rate)
+local function get_display_time_unit(player)
+  local player_settings = settings.get_player_settings(player.index)
+  local time_unit_setting = player_settings[live_tooltip_time_unit_setting_name]
+
+  if time_unit_setting then
+    return time_unit_setting.value
+  end
+
+  return "minute"
+end
+
+local function add_rate_line(parent, prototype_type, prototype_name, rate, display_time_unit)
   parent.add({
     type = "label",
     caption = {
@@ -56,8 +67,8 @@ local function add_rate_line(parent, prototype_type, prototype_name, rate)
   })
 end
 
-local function add_ingredient_rates(parent, recipe, crafts_per_second)
-  parent.add({ type = "label", caption = "Input:" })
+local function add_ingredient_rates(parent, recipe, crafts_per_second, display_time_unit)
+  parent.add({ type = "label", caption = { "factorio-rate-calculator-tooltip.input-label" } })
 
   local rates_flow = parent.add({ type = "flow", direction = "vertical" })
   local displayed_entries = 0
@@ -70,7 +81,8 @@ local function add_ingredient_rates(parent, recipe, crafts_per_second)
         rates_flow,
         rate_math.get_prototype_type(ingredient),
         prototype_name,
-        rate_math.get_ingredient_amount(ingredient) * crafts_per_second
+        rate_math.get_ingredient_amount(ingredient) * crafts_per_second,
+        display_time_unit
       )
       displayed_entries = displayed_entries + 1
     end
@@ -81,8 +93,8 @@ local function add_ingredient_rates(parent, recipe, crafts_per_second)
   end
 end
 
-local function add_product_rates(parent, entity, recipe, crafts_per_second)
-  parent.add({ type = "label", caption = "Ouput:" })
+local function add_product_rates(parent, entity, recipe, crafts_per_second, display_time_unit)
+  parent.add({ type = "label", caption = { "factorio-rate-calculator-tooltip.output-label" } })
 
   local rates_flow = parent.add({ type = "flow", direction = "vertical" })
   local displayed_entries = 0
@@ -101,7 +113,8 @@ local function add_product_rates(parent, entity, recipe, crafts_per_second)
         rates_flow,
         rate_math.get_prototype_type(product),
         prototype_name,
-        rate_math.get_product_amount_with_productivity(product, productivity_multiplier) * crafts_per_second
+        rate_math.get_product_amount_with_productivity(product, productivity_multiplier) * crafts_per_second,
+        display_time_unit
       )
       displayed_entries = displayed_entries + 1
     end
@@ -130,7 +143,7 @@ local function get_screen_gui_location(player)
   }
 end
 
-local function build_gui(player, entity, recipe)
+local function build_gui(player, entity, recipe, display_time_unit)
   destroy_gui(player)
 
   local craft_time = recipe.energy or 0.5
@@ -141,31 +154,35 @@ local function build_gui(player, entity, recipe)
     type = "frame",
     name = gui_name,
     direction = "vertical",
-    caption = { "", "[entity=" .. entity.name .. "] Rates" },
+    caption = { "factorio-rate-calculator-tooltip.live-rates-title", "[entity=" .. entity.name .. "]" },
   })
   frame.style.width = live_gui_width
   frame.location = get_screen_gui_location(player)
 
   frame.add({
     type = "label",
-    caption = { "", "Recipe: ", recipe.prototype.localised_name or { "recipe-name." .. recipe.name } },
+    caption = {
+      "factorio-rate-calculator-tooltip.recipe-label",
+      recipe.prototype.localised_name or { "recipe-name." .. recipe.name },
+    },
   })
   frame.add({
     type = "label",
-    caption = { "", "Speed: ", rate_math.format_number(crafting_speed), "x" },
+    caption = { "factorio-rate-calculator-tooltip.speed-label", rate_math.format_number(crafting_speed) },
   })
   frame.add({ type = "line", direction = "horizontal" })
-  add_ingredient_rates(frame, recipe, crafts_per_second)
-  add_product_rates(frame, entity, recipe, crafts_per_second)
+  add_ingredient_rates(frame, recipe, crafts_per_second, display_time_unit)
+  add_product_rates(frame, entity, recipe, crafts_per_second, display_time_unit)
 end
 
-local function get_selected_key(entity, recipe)
+local function get_selected_key(entity, recipe, display_time_unit)
   return table.concat({
     entity.unit_number or 0,
     entity.name,
     recipe.name,
     entity.crafting_speed or 1,
     entity.productivity_bonus or 0,
+    display_time_unit,
   }, ":")
 end
 
@@ -195,14 +212,15 @@ local function update_player(player)
     return
   end
 
-  local selected_key = get_selected_key(entity, recipe)
+  local display_time_unit = get_display_time_unit(player)
+  local selected_key = get_selected_key(entity, recipe, display_time_unit)
 
   if player_data.selected_key == selected_key then
     return
   end
 
   player_data.selected_key = selected_key
-  build_gui(player, entity, recipe)
+  build_gui(player, entity, recipe, display_time_unit)
 end
 
 script.on_init(init_storage)

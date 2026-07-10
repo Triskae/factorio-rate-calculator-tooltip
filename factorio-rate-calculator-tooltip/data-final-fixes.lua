@@ -6,8 +6,9 @@ local assembler_prototypes = {
   "assembling-machine-3",
 }
 
+local recipe_tooltip_time_unit_setting_name = "factorio-rate-calculator-tooltip-recipe-tooltip-time-unit"
 local tooltip_order_start = 220
-local display_time_unit = "minute"
+local display_time_unit = settings.startup[recipe_tooltip_time_unit_setting_name].value
 local max_tooltip_value_length = 180
 local max_rate_entries_per_field = 8
 local rate_text_separator = "  "
@@ -257,7 +258,7 @@ local function add_recipe_assembler_tooltips(recipe, recipe_assemblers, assemble
       end
 
       table.insert(recipe.custom_tooltip_fields, {
-        name = { "", "[item=" .. assembler_name .. "] Input" },
+        name = { "factorio-rate-calculator-tooltip.assembler-input-label", "[item=" .. assembler_name .. "]" },
         value = build_ingredient_rates_text(recipe, crafts_per_second),
         order = order + 1,
         show_in_tooltip = true,
@@ -265,7 +266,7 @@ local function add_recipe_assembler_tooltips(recipe, recipe_assemblers, assemble
       })
 
       table.insert(recipe.custom_tooltip_fields, {
-        name = { "", "[item=" .. assembler_name .. "] Output" },
+        name = { "factorio-rate-calculator-tooltip.assembler-output-label", "[item=" .. assembler_name .. "]" },
         value = build_product_rates_text(recipe, crafts_per_second),
         order = order + 2,
         show_in_tooltip = true,
