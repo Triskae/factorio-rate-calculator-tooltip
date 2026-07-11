@@ -2,11 +2,30 @@ local rate_math = require("rate-math")
 
 local gui_name = "frc_live_rates_frame"
 local live_tooltip_time_unit_setting_name = "factorio-rate-calculator-tooltip-live-tooltip-time-unit"
+local show_belt_fill_targets_setting_name = "factorio-rate-calculator-tooltip-show-belt-fill-targets"
 local max_rate_entries_per_field = 4
 local live_gui_width = 330
 local game_side_panel_width = 315
 local live_gui_side_gap = 2
 local live_gui_top_margin = 18
+
+local transport_belts = {
+  {
+    capacity_per_second = 15,
+    icon = "[entity=transport-belt]",
+    label = { "factorio-rate-calculator-tooltip.yellow-belt-label" },
+  },
+  {
+    capacity_per_second = 30,
+    icon = "[entity=fast-transport-belt]",
+    label = { "factorio-rate-calculator-tooltip.red-belt-label" },
+  },
+  {
+    capacity_per_second = 45,
+    icon = "[entity=express-transport-belt]",
+    label = { "factorio-rate-calculator-tooltip.blue-belt-label" },
+  },
+}
 
 local craft_entity_types = {
   ["assembling-machine"] = true,
@@ -53,6 +72,17 @@ local function get_display_time_unit(player)
   end
 
   return "minute"
+end
+
+local function should_show_belt_fill_targets(player)
+  local player_settings = settings.get_player_settings(player.index)
+  local show_setting = player_settings[show_belt_fill_targets_setting_name]
+
+  if show_setting then
+    return show_setting.value
+  end
+
+  return true
 end
 
 local function add_rate_line(parent, prototype_type, prototype_name, rate, display_time_unit)
@@ -125,6 +155,59 @@ local function add_product_rates(parent, entity, recipe, crafts_per_second, disp
   end
 end
 
+local function add_belt_fill_target_line(parent, product_icon, belt, product_rate_per_second)
+  local machine_count = belt.capacity_per_second / product_rate_per_second
+
+  parent.add({
+    type = "label",
+    caption = {
+      "factorio-rate-calculator-tooltip.belt-fill-target-line",
+      product_icon,
+      belt.icon,
+      belt.label,
+      rate_math.format_number(machine_count),
+    },
+  })
+end
+
+local function add_belt_fill_targets(parent, entity, recipe, crafts_per_second)
+  parent.add({ type = "label", caption = { "factorio-rate-calculator-tooltip.belt-fill-targets-label" } })
+
+  local targets_flow = parent.add({ type = "flow", direction = "vertical" })
+  local displayed_entries = 0
+  local productivity_multiplier = get_productivity_multiplier(entity, recipe)
+
+  for _, product in pairs(recipe.products or {}) do
+    if rate_math.get_prototype_type(product) == "item" then
+      local prototype_name = rate_math.get_prototype_name(product)
+
+      if prototype_name then
+        local product_rate_per_second =
+          rate_math.get_product_amount_with_productivity(product, productivity_multiplier) * crafts_per_second
+
+        if product_rate_per_second > 0 then
+          if displayed_entries >= max_rate_entries_per_field then
+            targets_flow.add({ type = "label", caption = "..." })
+            break
+          end
+
+          local product_icon = rate_math.get_rich_text_icon("item", prototype_name)
+
+          for _, belt in ipairs(transport_belts) do
+            add_belt_fill_target_line(targets_flow, product_icon, belt, product_rate_per_second)
+          end
+
+          displayed_entries = displayed_entries + 1
+        end
+      end
+    end
+  end
+
+  if displayed_entries == 0 then
+    targets_flow.add({ type = "label", caption = "-" })
+  end
+end
+
 local function destroy_gui(player)
   local frame = player.gui.screen[gui_name]
 
@@ -143,7 +226,7 @@ local function get_screen_gui_location(player)
   }
 end
 
-local function build_gui(player, entity, recipe, display_time_unit)
+local function build_gui(player, entity, recipe, display_time_unit, show_belt_fill_targets)
   destroy_gui(player)
 
   local craft_time = recipe.energy or 0.5
@@ -173,9 +256,14 @@ local function build_gui(player, entity, recipe, display_time_unit)
   frame.add({ type = "line", direction = "horizontal" })
   add_ingredient_rates(frame, recipe, crafts_per_second, display_time_unit)
   add_product_rates(frame, entity, recipe, crafts_per_second, display_time_unit)
+
+  if show_belt_fill_targets then
+    frame.add({ type = "line", direction = "horizontal" })
+    add_belt_fill_targets(frame, entity, recipe, crafts_per_second)
+  end
 end
 
-local function get_selected_key(entity, recipe, display_time_unit)
+local function get_selected_key(entity, recipe, display_time_unit, show_belt_fill_targets)
   return table.concat({
     entity.unit_number or 0,
     entity.name,
@@ -183,6 +271,7 @@ local function get_selected_key(entity, recipe, display_time_unit)
     entity.crafting_speed or 1,
     entity.productivity_bonus or 0,
     display_time_unit,
+    tostring(show_belt_fill_targets),
   }, ":")
 end
 
@@ -213,14 +302,15 @@ local function update_player(player)
   end
 
   local display_time_unit = get_display_time_unit(player)
-  local selected_key = get_selected_key(entity, recipe, display_time_unit)
+  local show_belt_fill_targets = should_show_belt_fill_targets(player)
+  local selected_key = get_selected_key(entity, recipe, display_time_unit, show_belt_fill_targets)
 
   if player_data.selected_key == selected_key then
     return
   end
 
   player_data.selected_key = selected_key
-  build_gui(player, entity, recipe, display_time_unit)
+  build_gui(player, entity, recipe, display_time_unit, show_belt_fill_targets)
 end
 
 script.on_init(init_storage)

@@ -17,4 +17,11 @@ data:extend({
     allowed_values = time_unit_values,
     order = "b[live-tooltip]-a[time-unit]",
   },
+  {
+    type = "bool-setting",
+    name = "factorio-rate-calculator-tooltip-show-belt-fill-targets",
+    setting_type = "runtime-per-user",
+    default_value = true,
+    order = "b[live-tooltip]-b[belt-fill-targets]",
+  },
 })
