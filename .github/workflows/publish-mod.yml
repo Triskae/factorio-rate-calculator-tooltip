@@ -1,0 +1,100 @@
+name: Publish Factorio Mod
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      ref_to_publish:
+        description: "Tag or branch to package and publish, for example v0.1.2"
+        required: true
+        type: string
+
+jobs:
+  publish:
+    name: Package and upload to Mod Portal
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout release ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref_to_publish || github.ref }}
+
+      - name: Install packaging tools
+        run: sudo apt-get update && sudo apt-get install -y jq zip
+
+      - name: Package mod
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mod_dir="factorio-rate-calculator-tooltip"
+          name="$(jq -r '.name' "$mod_dir/info.json")"
+          version="$(jq -r '.version' "$mod_dir/info.json")"
+          factorio_version="$(jq -r '.factorio_version' "$mod_dir/info.json")"
+          zip_file="${name}_${version}.zip"
+
+          ./package.sh "$mod_dir"
+
+          unzip -p "$zip_file" "$mod_dir/info.json" | jq .
+
+          {
+            echo "mod_name=$name"
+            echo "mod_version=$version"
+            echo "factorio_version=$factorio_version"
+            echo "zip_file=$zip_file"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upload to Factorio Mod Portal
+        shell: bash
+        env:
+          FACTORIO_API_KEY: ${{ secrets.FACTORIO_API_KEY }}
+          MOD_NAME: ${{ steps.package.outputs.mod_name }}
+          ZIP_FILE: ${{ steps.package.outputs.zip_file }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${FACTORIO_API_KEY:-}" ]]; then
+            echo "Missing FACTORIO_API_KEY secret"
+            exit 1
+          fi
+
+          init_response="$(
+            curl --fail-with-body --silent --show-error \
+              --header "Authorization: Bearer $FACTORIO_API_KEY" \
+              --form "mod=$MOD_NAME" \
+              https://mods.factorio.com/api/v2/mods/releases/init_upload
+          )"
+
+          upload_url="$(jq -r '.upload_url // empty' <<< "$init_response")"
+          if [[ -z "$upload_url" ]]; then
+            echo "init_upload did not return upload_url:"
+            echo "$init_response"
+            exit 1
+          fi
+
+          upload_response="$(
+            curl --fail-with-body --silent --show-error \
+              --form "file=@$ZIP_FILE" \
+              "$upload_url"
+          )"
+
+          echo "$upload_response"
+
+      - name: Summary
+        run: |
+          {
+            echo "Published ${MOD_NAME} ${MOD_VERSION}"
+            echo "Factorio version: ${FACTORIO_VERSION}"
+            echo "Package: ${ZIP_FILE}"
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          MOD_NAME: ${{ steps.package.outputs.mod_name }}
+          MOD_VERSION: ${{ steps.package.outputs.mod_version }}
+          FACTORIO_VERSION: ${{ steps.package.outputs.factorio_version }}
+          ZIP_FILE: ${{ steps.package.outputs.zip_file }}
