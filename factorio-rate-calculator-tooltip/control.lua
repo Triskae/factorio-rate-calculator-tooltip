@@ -38,6 +38,32 @@ local function init_storage()
   storage.players = storage.players or {}
 end
 
+local function get_recipe_id_name(recipe_id)
+  if not recipe_id then
+    return nil
+  end
+
+  if type(recipe_id) == "string" then
+    return recipe_id
+  end
+
+  return recipe_id.name
+end
+
+local function get_previous_recipe_name(entity)
+  local previous_recipe = entity.previous_recipe
+
+  if not previous_recipe then
+    return nil
+  end
+
+  if type(previous_recipe) == "table" then
+    return get_recipe_id_name(previous_recipe.name)
+  end
+
+  return get_recipe_id_name(previous_recipe)
+end
+
 local function get_recipe(player, entity)
   local recipe = entity.get_recipe and entity.get_recipe()
 
@@ -46,8 +72,7 @@ local function get_recipe(player, entity)
   end
 
   if entity.type == "furnace" and entity.previous_recipe then
-    local previous_recipe = entity.previous_recipe
-    local previous_recipe_name = previous_recipe.name or previous_recipe
+    local previous_recipe_name = get_previous_recipe_name(entity)
 
     if previous_recipe_name then
       return player.force.recipes[previous_recipe_name]
