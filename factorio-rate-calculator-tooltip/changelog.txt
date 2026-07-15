@@ -1,0 +1,67 @@
+---------------------------------------------------------------------------------------------------
+Version: 0.1.9
+Date: 15. 07. 2026
+  Bugfixes:
+    - Fixed a crash when hovering furnaces with a previous recipe in Factorio 2.1.
+---------------------------------------------------------------------------------------------------
+Version: 0.1.8
+Date: 15. 07. 2026
+  Bugfixes:
+    - Fixed a crash when hovering furnaces with a previous recipe in Factorio 2.0.
+---------------------------------------------------------------------------------------------------
+Version: 0.1.7
+Date: 15. 07. 2026
+  Compatibility:
+    - Added Factorio 2.1 release metadata.
+---------------------------------------------------------------------------------------------------
+Version: 0.1.6
+Date: 15. 07. 2026
+  Features:
+    - Added live rate tooltips for mining drills.
+    - Added resource input and output rates for mining drills.
+    - Added mining drill and resource rates to static tooltips in menus and Factoriopedia.
+  Changes:
+    - Static recipe tooltips now keep crafting-machine rates separate from mining-drill rates.
+  Compatibility:
+    - Added Factorio 2.0 release metadata.
+---------------------------------------------------------------------------------------------------
+Version: 0.1.5
+Date: 15. 07. 2026
+  Compatibility:
+    - Added Factorio 2.1 release metadata.
+---------------------------------------------------------------------------------------------------
+Version: 0.1.4
+Date: 15. 07. 2026
+  Compatibility:
+    - Added Factorio 2.0 release metadata.
+---------------------------------------------------------------------------------------------------
+Version: 0.1.3
+Date: 13. 07. 2026
+  Compatibility:
+    - Added Factorio 2.1 release metadata.
+---------------------------------------------------------------------------------------------------
+Version: 0.1.2
+Date: 13. 07. 2026
+  Features:
+    - Added belt fill target counts to the live hover panel.
+    - Added a runtime setting to show or hide belt fill targets.
+  Changes:
+    - Added configurable rate units for recipe tooltips and live hover panels.
+    - Added recipe rate tooltips for all compatible crafting machines.
+  Locale:
+    - Added English and French locale entries.
+  Compatibility:
+    - Added Factorio 2.0 release metadata.
+---------------------------------------------------------------------------------------------------
+Version: 0.1.1
+Date: 13. 07. 2026
+  Features:
+    - Added static recipe rate tooltips.
+    - Added a live hover panel for crafting machines.
+  Info:
+    - Added README, screenshots, thumbnail, licence, and packaging script.
+---------------------------------------------------------------------------------------------------
+Version: 0.1.0
+Date: 13. 07. 2026
+  Major Features:
+    - Initial release.
