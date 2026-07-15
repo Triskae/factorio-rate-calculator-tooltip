@@ -30,6 +30,7 @@ local transport_belts = {
 local craft_entity_types = {
   ["assembling-machine"] = true,
   ["furnace"] = true,
+  ["mining-drill"] = true,
   ["rocket-silo"] = true,
 }
 
@@ -45,22 +46,130 @@ local function get_recipe(player, entity)
   end
 
   if entity.type == "furnace" and entity.previous_recipe then
-    local previous_recipe_prototype = entity.previous_recipe.name
+    local previous_recipe = entity.previous_recipe
+    local previous_recipe_name = previous_recipe.name or previous_recipe
 
-    if previous_recipe_prototype and previous_recipe_prototype.name then
-      return player.force.recipes[previous_recipe_prototype.name]
+    if previous_recipe_name then
+      return player.force.recipes[previous_recipe_name]
     end
   end
 
   return nil
 end
 
+local function get_entity_productivity_bonus(entity)
+  local success, productivity_bonus = pcall(function()
+    return entity.productivity_bonus
+  end)
+
+  if success then
+    return productivity_bonus or 0
+  end
+
+  return 0
+end
+
+local function get_force_mining_productivity_bonus(force)
+  local success, productivity_bonus = pcall(function()
+    return force.mining_drill_productivity_bonus
+  end)
+
+  if success then
+    return productivity_bonus or 0
+  end
+
+  return 0
+end
+
 local function get_productivity_multiplier(entity, recipe)
   local recipe_productivity = recipe.productivity_bonus or 0
   local maximum_productivity = recipe.prototype.maximum_productivity or 0
-  local productivity_bonus = (entity.productivity_bonus or 0) + recipe_productivity
+  local productivity_bonus = get_entity_productivity_bonus(entity) + recipe_productivity
 
   return 1 + math.min(productivity_bonus, maximum_productivity)
+end
+
+local function get_mining_productivity_multiplier(player, entity)
+  return 1 + get_entity_productivity_bonus(entity) + get_force_mining_productivity_bonus(player.force)
+end
+
+local function get_mining_speed(entity)
+  return (entity.prototype and entity.prototype.mining_speed) or 1
+end
+
+local function get_mining_ingredients(mineable_properties)
+  if mineable_properties.required_fluid and mineable_properties.fluid_amount then
+    return {
+      {
+        type = "fluid",
+        name = mineable_properties.required_fluid,
+        amount = mineable_properties.fluid_amount,
+      },
+    }
+  end
+
+  return {}
+end
+
+local function get_mining_products(mineable_properties)
+  return mineable_properties.products or {}
+end
+
+local function get_crafting_rate_context(player, entity)
+  local recipe = get_recipe(player, entity)
+
+  if not recipe then
+    return nil
+  end
+
+  local crafting_speed = entity.crafting_speed or 1
+
+  return {
+    key = recipe.name,
+    subject_caption = { "factorio-rate-calculator-tooltip.recipe-label", recipe.prototype.localised_name or { "recipe-name." .. recipe.name } },
+    speed = crafting_speed,
+    operations_per_second = crafting_speed / (recipe.energy or 0.5),
+    ingredients = recipe.ingredients or {},
+    products = recipe.products or {},
+    productivity_multiplier = get_productivity_multiplier(entity, recipe),
+  }
+end
+
+local function get_mining_rate_context(player, entity)
+  local mining_target = entity.mining_target
+
+  if not mining_target or not mining_target.valid then
+    return nil
+  end
+
+  local mineable_properties = mining_target.prototype.mineable_properties
+
+  if not mineable_properties then
+    return nil
+  end
+
+  local mining_speed = get_mining_speed(entity)
+
+  return {
+    key = mining_target.name,
+    subject_caption = {
+      "factorio-rate-calculator-tooltip.resource-label",
+      mining_target.prototype.localised_name or { "entity-name." .. mining_target.name },
+    },
+    speed = mining_speed,
+    operations_per_second = mining_speed / (mineable_properties.mining_time or 1),
+    ingredients = get_mining_ingredients(mineable_properties),
+    products = get_mining_products(mineable_properties),
+    productivity_multiplier = get_mining_productivity_multiplier(player, entity),
+  }
+end
+
+local function get_rate_context(player, entity)
+  if entity.type == "mining-drill" then
+    return get_mining_rate_context(player, entity)
+  end
+
+  return get_crafting_rate_context(player, entity)
 end
 
 local function get_display_time_unit(player)
@@ -97,13 +206,13 @@ local function add_rate_line(parent, prototype_type, prototype_name, rate, displ
   })
 end
 
-local function add_ingredient_rates(parent, recipe, crafts_per_second, display_time_unit)
+local function add_ingredient_rates(parent, ingredients, operations_per_second, display_time_unit)
   parent.add({ type = "label", caption = { "factorio-rate-calculator-tooltip.input-label" } })
 
   local rates_flow = parent.add({ type = "flow", direction = "vertical" })
   local displayed_entries = 0
 
-  for _, ingredient in pairs(recipe.ingredients or {}) do
+  for _, ingredient in pairs(ingredients or {}) do
     local prototype_name = rate_math.get_prototype_name(ingredient)
 
     if prototype_name then
@@ -111,7 +220,7 @@ local function add_ingredient_rates(parent, recipe, crafts_per_second, display_t
         rates_flow,
         rate_math.get_prototype_type(ingredient),
         prototype_name,
-        rate_math.get_ingredient_amount(ingredient) * crafts_per_second,
+        rate_math.get_ingredient_amount(ingredient) * operations_per_second,
         display_time_unit
       )
       displayed_entries = displayed_entries + 1
@@ -123,14 +232,13 @@ local function add_ingredient_rates(parent, recipe, crafts_per_second, display_t
   end
 end
 
-local function add_product_rates(parent, entity, recipe, crafts_per_second, display_time_unit)
+local function add_product_rates(parent, products, productivity_multiplier, operations_per_second, display_time_unit)
   parent.add({ type = "label", caption = { "factorio-rate-calculator-tooltip.output-label" } })
 
   local rates_flow = parent.add({ type = "flow", direction = "vertical" })
   local displayed_entries = 0
-  local productivity_multiplier = get_productivity_multiplier(entity, recipe)
 
-  for _, product in pairs(recipe.products or {}) do
+  for _, product in pairs(products or {}) do
     local prototype_name = rate_math.get_prototype_name(product)
 
     if prototype_name then
@@ -143,7 +251,7 @@ local function add_product_rates(parent, entity, recipe, crafts_per_second, disp
         rates_flow,
         rate_math.get_prototype_type(product),
         prototype_name,
-        rate_math.get_product_amount_with_productivity(product, productivity_multiplier) * crafts_per_second,
+        rate_math.get_product_amount_with_productivity(product, productivity_multiplier) * operations_per_second,
         display_time_unit
       )
       displayed_entries = displayed_entries + 1
@@ -170,20 +278,19 @@ local function add_belt_fill_target_line(parent, product_icon, belt, product_rat
   })
 end
 
-local function add_belt_fill_targets(parent, entity, recipe, crafts_per_second)
+local function add_belt_fill_targets(parent, products, productivity_multiplier, operations_per_second)
   parent.add({ type = "label", caption = { "factorio-rate-calculator-tooltip.belt-fill-targets-label" } })
 
   local targets_flow = parent.add({ type = "flow", direction = "vertical" })
   local displayed_entries = 0
-  local productivity_multiplier = get_productivity_multiplier(entity, recipe)
 
-  for _, product in pairs(recipe.products or {}) do
+  for _, product in pairs(products or {}) do
     if rate_math.get_prototype_type(product) == "item" then
       local prototype_name = rate_math.get_prototype_name(product)
 
       if prototype_name then
         local product_rate_per_second =
-          rate_math.get_product_amount_with_productivity(product, productivity_multiplier) * crafts_per_second
+          rate_math.get_product_amount_with_productivity(product, productivity_multiplier) * operations_per_second
 
         if product_rate_per_second > 0 then
           if displayed_entries >= max_rate_entries_per_field then
@@ -226,12 +333,8 @@ local function get_screen_gui_location(player)
   }
 end
 
-local function build_gui(player, entity, recipe, display_time_unit, show_belt_fill_targets)
+local function build_gui(player, entity, rate_context, display_time_unit, show_belt_fill_targets)
   destroy_gui(player)
-
-  local craft_time = recipe.energy or 0.5
-  local crafting_speed = entity.crafting_speed or 1
-  local crafts_per_second = crafting_speed / craft_time
 
   local frame = player.gui.screen.add({
     type = "frame",
@@ -244,32 +347,43 @@ local function build_gui(player, entity, recipe, display_time_unit, show_belt_fi
 
   frame.add({
     type = "label",
-    caption = {
-      "factorio-rate-calculator-tooltip.recipe-label",
-      recipe.prototype.localised_name or { "recipe-name." .. recipe.name },
-    },
+    caption = rate_context.subject_caption,
   })
   frame.add({
     type = "label",
-    caption = { "factorio-rate-calculator-tooltip.speed-label", rate_math.format_number(crafting_speed) },
+    caption = { "factorio-rate-calculator-tooltip.speed-label", rate_math.format_number(rate_context.speed) },
   })
   frame.add({ type = "line", direction = "horizontal" })
-  add_ingredient_rates(frame, recipe, crafts_per_second, display_time_unit)
-  add_product_rates(frame, entity, recipe, crafts_per_second, display_time_unit)
+  add_ingredient_rates(frame, rate_context.ingredients, rate_context.operations_per_second, display_time_unit)
+  add_product_rates(
+    frame,
+    rate_context.products,
+    rate_context.productivity_multiplier,
+    rate_context.operations_per_second,
+    display_time_unit
+  )
 
   if show_belt_fill_targets then
     frame.add({ type = "line", direction = "horizontal" })
-    add_belt_fill_targets(frame, entity, recipe, crafts_per_second)
+    add_belt_fill_targets(
+      frame,
+      rate_context.products,
+      rate_context.productivity_multiplier,
+      rate_context.operations_per_second
+    )
   end
 end
 
-local function get_selected_key(entity, recipe, display_time_unit, show_belt_fill_targets)
+local function get_selected_key(entity, rate_context, display_time_unit, show_belt_fill_targets)
   return table.concat({
     entity.unit_number or 0,
     entity.name,
-    recipe.name,
-    entity.crafting_speed or 1,
-    entity.productivity_bonus or 0,
+    entity.type,
+    rate_context.key,
+    rate_context.speed,
+    rate_context.operations_per_second,
+    get_entity_productivity_bonus(entity),
+    rate_context.productivity_multiplier,
     display_time_unit,
     tostring(show_belt_fill_targets),
   }, ":")
@@ -290,9 +404,9 @@ local function update_player(player)
     return
   end
 
-  local recipe = get_recipe(player, entity)
+  local rate_context = get_rate_context(player, entity)
 
-  if not recipe then
+  if not rate_context then
     if player_data.selected_key then
       destroy_gui(player)
       player_data.selected_key = nil
@@ -303,14 +417,14 @@ local function update_player(player)
 
   local display_time_unit = get_display_time_unit(player)
   local show_belt_fill_targets = should_show_belt_fill_targets(player)
-  local selected_key = get_selected_key(entity, recipe, display_time_unit, show_belt_fill_targets)
+  local selected_key = get_selected_key(entity, rate_context, display_time_unit, show_belt_fill_targets)
 
   if player_data.selected_key == selected_key then
     return
   end
 
   player_data.selected_key = selected_key
-  build_gui(player, entity, recipe, display_time_unit, show_belt_fill_targets)
+  build_gui(player, entity, rate_context, display_time_unit, show_belt_fill_targets)
 end
 
 script.on_init(init_storage)
