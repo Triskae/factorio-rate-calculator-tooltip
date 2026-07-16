@@ -8,6 +8,7 @@ local live_gui_width = 330
 local game_side_panel_width = 315
 local live_gui_side_gap = 2
 local live_gui_top_margin = 18
+local mining_required_fluid_amount_divisor = 10
 
 local transport_belts = {
   {
@@ -94,18 +95,6 @@ local function get_entity_productivity_bonus(entity)
   return 0
 end
 
-local function get_force_mining_productivity_bonus(force)
-  local success, productivity_bonus = pcall(function()
-    return force.mining_drill_productivity_bonus
-  end)
-
-  if success then
-    return productivity_bonus or 0
-  end
-
-  return 0
-end
-
 local function get_productivity_multiplier(entity, recipe)
   local recipe_productivity = recipe.productivity_bonus or 0
   local maximum_productivity = recipe.prototype.maximum_productivity or 0
@@ -114,8 +103,8 @@ local function get_productivity_multiplier(entity, recipe)
   return 1 + math.min(productivity_bonus, maximum_productivity)
 end
 
-local function get_mining_productivity_multiplier(player, entity)
-  return 1 + get_entity_productivity_bonus(entity) + get_force_mining_productivity_bonus(player.force)
+local function get_mining_productivity_multiplier(entity)
+  return 1 + get_entity_productivity_bonus(entity)
 end
 
 local function get_mining_speed(entity)
@@ -128,7 +117,7 @@ local function get_mining_ingredients(mineable_properties)
       {
         type = "fluid",
         name = mineable_properties.required_fluid,
-        amount = mineable_properties.fluid_amount,
+        amount = mineable_properties.fluid_amount / mining_required_fluid_amount_divisor,
       },
     }
   end
@@ -185,7 +174,7 @@ local function get_mining_rate_context(player, entity)
     operations_per_second = mining_speed / (mineable_properties.mining_time or 1),
     ingredients = get_mining_ingredients(mineable_properties),
     products = get_mining_products(mineable_properties),
-    productivity_multiplier = get_mining_productivity_multiplier(player, entity),
+    productivity_multiplier = get_mining_productivity_multiplier(entity),
   }
 end
 

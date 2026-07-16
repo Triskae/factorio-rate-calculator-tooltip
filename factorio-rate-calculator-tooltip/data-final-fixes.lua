@@ -12,6 +12,7 @@ local display_time_unit = settings.startup[recipe_tooltip_time_unit_setting_name
 local max_tooltip_value_length = 180
 local max_rate_entries_per_field = 8
 local rate_text_separator = "  "
+local mining_required_fluid_amount_divisor = 10
 
 local function get_recipe_ingredients(recipe)
   return recipe.ingredients or {}
@@ -155,7 +156,7 @@ local function get_minable_ingredients(minable)
       {
         type = "fluid",
         name = minable.required_fluid,
-        amount = minable.fluid_amount,
+        amount = minable.fluid_amount / mining_required_fluid_amount_divisor,
       },
     }
   end
