@@ -2,16 +2,12 @@
 Version: 0.1.11
 Date: 16. 07. 2026
   Bugfixes:
-    - Fixed uranium mining drill rates in Factorio 2.1.
-    - Fixed sulfuric acid consumption being shown ten times too high for uranium mining.
-    - Fixed mining productivity being applied twice to live mining drill output rates.
+    - Fixed uranium mining drill rates in Factorio 2.1, including sulfuric acid consumption, mining productivity, and speed bonuses.
 ---------------------------------------------------------------------------------------------------
 Version: 0.1.10
 Date: 16. 07. 2026
   Bugfixes:
-    - Fixed uranium mining drill rates in Factorio 2.0.
-    - Fixed sulfuric acid consumption being shown ten times too high for uranium mining.
-    - Fixed mining productivity being applied twice to live mining drill output rates.
+    - Fixed uranium mining drill rates in Factorio 2.0, including sulfuric acid consumption, mining productivity, and speed bonuses.
 ---------------------------------------------------------------------------------------------------
 Version: 0.1.9
 Date: 15. 07. 2026

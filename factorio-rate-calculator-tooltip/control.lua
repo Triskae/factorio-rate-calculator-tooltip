@@ -107,8 +107,20 @@ local function get_mining_productivity_multiplier(entity)
   return 1 + get_entity_productivity_bonus(entity)
 end
 
+local function get_entity_speed_bonus(entity)
+  local success, speed_bonus = pcall(function()
+    return entity.speed_bonus
+  end)
+
+  if success then
+    return speed_bonus or 0
+  end
+
+  return 0
+end
+
 local function get_mining_speed(entity)
-  return (entity.prototype and entity.prototype.mining_speed) or 1
+  return ((entity.prototype and entity.prototype.mining_speed) or 1) * (1 + get_entity_speed_bonus(entity))
 end
 
 local function get_mining_ingredients(mineable_properties)
