@@ -1,11 +1,11 @@
 {
   "name": "factorio-rate-calculator-tooltip",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "title": "Rate Calculator Tooltip",
   "author": "Triskae",
-  "factorio_version": "2.1",
+  "factorio_version": "2.0",
   "description": "Displays a tooltip when hovering over production buildings, showing production and consumption rates in items per second, minute, or hour to make ratio calculations easier.",
   "dependencies": [
-    "base >= 2.1"
+    "base >= 2.0"
   ]
 }
